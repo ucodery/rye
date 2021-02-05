@@ -1,0 +1,5 @@
+[tasks.done]
+command = "git"
+args = ["commit", "--message", "done for today"]
+command = "git"
+args = ["push"]
