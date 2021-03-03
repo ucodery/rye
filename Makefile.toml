@@ -1,5 +1,27 @@
-[tasks.done]
+[tasks.check]
+command = "cargo"
+args = ["run"]
+
+# Testing #
+[tasks.pycompile]
+command = "python"
+args = ["-m", "py_compile"]
+
+# Github Flow #
+[tasks.commit]
 command = "git"
 args = ["commit", "--message", "done for today"]
+
+[tasks.push]
 command = "git"
 args = ["push"]
+
+[takss.pull]
+command = "git"
+args = ["pull", "ucodery", "--ff"]
+
+[tasks.done]
+dependencies = ["commit", "push"]
+
+[tasks.do]
+dependencies = ["pull"]

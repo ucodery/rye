@@ -1,0 +1,33 @@
+// String Literals
+
+escapedchar = { "\\" ~ ANY }
+singlequote = { "'" ~ (escapedchar | !"\\" ~ !NEWLINE ~ !"'" ~ ANY)* ~ "'" }
+doublequote = { "\"" ~ (escapedchar | !"\\" ~ !NEWLINE ~ !"\"" ~ ANY)* ~ "\"" }
+triplesinglequote = { "'''" ~ (escapedchar | !"\\" ~ ANY)* ~ "'''" }
+tripledoublequote = { "\"\"\"" ~ (escapedchar | !"\\" ~ ANY)* ~ "\"\"\"" }
+stringtype = { ^"r" | ^"u" | ^"f" | ^"r" ~ ^"f" | ^"f" ~ ^"r" }
+string = { stringtype? ~ (singlequote | doublequote | triplesinglequote | tripledoublequote) }
+
+escapedbyte = { "\\" ~ ASCII }
+singlebytes = { "'" ~ (escapedbyte | !"\\" ~ !NEWLINE ~ !"'" ~ ASCII)* ~ "'" }
+doublebytes = { "\"" ~ (escapedbyte | !"\\" ~ !NEWLINE ~ !"\"" ~ ASCII)* ~ "\"" }
+triplesinglebytes = { "'''" ~ (escapedbyte | !"\\" ~ ASCII)* ~ "'''" }
+tripledoublebytes = { "\"\"\"" ~ (escapedbyte | !"\\" ~ ASCII)* ~ "\"\"\"" }
+bytestype = { (^"b" ~ ^"r"? | ^"r" ~ ^"b") }
+bytes = {bytestype? ~ (singlebytes | doublebytes | triplesinglebytes | tripledoublebytes) }
+
+// Numeric Literals
+binint = { "0" ~ ^"b" ~ ("_"? ~ '0'..'1')+ }
+octint = { "0" ~ ^"o" ~ ("_"? ~ '0'..'7')+ }
+hexint = { "0" ~ ^"x" ~ ("_"? ~ ('0'..'9' | 'a'..'f' | 'A'..'F'))+ }
+decint = { ('1'..'9' ~ ("_"? ~ '0'..'9')*) | ("0" ~ ("_"? ~ "0")*) }
+int = { binint | octint | hexint | decint }
+
+floatdigits = { '0'..'9' ~ ("_"? ~ '0'..'9')* }
+floatpoint = { (floatdigits? ~ "." ~ floatdigits) | (floatdigits ~ ".") }
+scientific = { (floatpoint | floatdigits) ~ ^"e" ~ ("+" | "-")? ~ floatdigits }
+float = { scientific | floatpoint }
+
+imag = { (float | floatdigits) ~ ^"j" }
+
+world = { SOI ~ imag | float | int ~ EOI }
