@@ -1,0 +1,14 @@
+use inline_python::{Context,python};
+
+
+// not currenlty working likely due to different compiler toolchain used for python
+// ImportError: dlopen(/Users/ucodery/.pyenv/versions/3.9.6/lib/python3.9/lib-dynload/_posixsubprocess.cpython-39-darwin.so, 0x0002): symbol not found in flat namespace '_PyInterpreterState_Get'
+// NOTE: hypothesmith must be installed in the real python underlying any virtual-env
+fn fuzz(){
+    let py: Context = python! {
+        import hypothesmith
+        generate = hypothesmith.from_grammar()
+        out = generate.example()
+    };
+    let some_python = py.get::<String>("out");
+}

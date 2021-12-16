@@ -2,21 +2,32 @@ pub mod tokenize;
 pub mod tokens;
 
 fn main() {
-    let ts = tokenize::TokenStream::new("foo = (bar==4*3//21+7)");
+    let ts = tokenize::TokenStream::new(
+        "def foo(a, b=12.0):
+            c = a + b
+
+            if (
+                c > 42
+            ):
+                return False
+
+            return True",
+    );
     for found in ts {
-        match found {
-            tokens::Token {
-                token_type: t,
-                size: Some(s),
-            } => {
-                println!("Found {:?} starting at {} and of size {}", t, "?", s)
-            }
-            tokens::Token {
-                token_type: t,
-                size: None,
-            } => {
-                println!("Found {:?} starting at {} and of size {}", t, "?", "?")
-            }
-        }
+        let tokens::Token {
+            token_type,
+            exact_token_type,
+            token_contents,
+            col_start,
+            col_end,
+        } = found.unwrap();
+        println!(
+            "Found {:?}: {:?} \"{}\" starting at {} and of size {}",
+            token_type,
+            exact_token_type,
+            token_contents,
+            col_start,
+            (col_end - col_start)
+        )
     }
 }
