@@ -74,7 +74,7 @@ pub enum TokenType {
     ENCODING,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
     pub token_type: TokenType,
     pub exact_token_type: TokenType,

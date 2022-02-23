@@ -7,6 +7,35 @@ args = ["run"]
 command = "python"
 args = ["-m", "py_compile"]
 
+[tasks._make_grcov]
+condition = {"files_not_exist" = ["./grcov"]}
+command = "mkdir"
+args = ["grcov"]
+
+[tasks._clean_grcov]
+condition = {"files_exist" = ["./grcov"]}
+command = "rm"
+args = ["-r", "./grcov"]
+
+[tasks._build_grcov]
+env = {"RUSTFLAGS" = "-Zinstrument-coverage"}
+command = "cargo"
+args = ["build"]
+
+[tasks._test_grcov]
+env = {"RUSTFLAGS" = "-Zinstrument-coverage", "LLVM_PROFILE_FILE" = "grcov/test-coverage-%p-%m.profraw"}
+command = "cargo"
+args = ["test"]
+
+[tasks._html_grcov]
+command = "grcov"
+args = [".", "--binary-path", "target/debug/", "-s", ".", "-t", "html", "--branch", "--ignore-not-existing", "-o", "./grcov/"]
+
+[tasks.grcov]
+command = "open"
+args = ["./grcov/index.html"]
+dependencies = ["_clean_grcov", "_make_grcov", "_build_grcov", "_test_grcov", "_html_grcov"]
+
 # Github Flow #
 [tasks.commit]
 command = "git"
@@ -16,7 +45,7 @@ args = ["commit", "--message", "done for today"]
 command = "git"
 args = ["push"]
 
-[takss.pull]
+[tasks.pull]
 command = "git"
 args = ["pull", "ucodery", "--ff"]
 

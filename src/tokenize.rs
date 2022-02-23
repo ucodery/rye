@@ -92,6 +92,7 @@ impl TokenStream {
             col_start,
             col_end,
         });
+
     }
 
     fn commit_to_token(&mut self, token_type: TokenType, exact_token_type: TokenType) {
@@ -399,7 +400,11 @@ impl TokenStream {
                     last_under = false;
                 }
                 _ => {
-                    self.source.hide(1);
+                    if last_under {
+                        self.source.hide(2);
+                    } else {
+                        self.source.hide(1);
+                    };
                     return;
                 }
             }
@@ -449,15 +454,13 @@ impl TokenStream {
                         self.find_end_of_integer(Self::is_hex_digit);
                     }
                     [next, ..] if Self::is_dec_digit(next) => {
-                        if *next == '0' {
+                        let is_zero = *next == '0';
                             // put unchecked char back
-                            self.source.hide(1);
-
-                            // this is the longest possible intiger token as only zero can have
+                        self.source.hide(1);
+                        if is_zero {
+                            // this is the longest possible integer token as only zero can have
                             // leading 0s
                             self.find_end_of_integer(|c| *c == '0');
-                        } else {
-                            self.source.hide(2);
                         };
                         match self.source.peek(1) {
                             ['.'] => {
@@ -476,11 +479,12 @@ impl TokenStream {
                                     number_type = TokenType::FLOAT;
                                 } else {
                                     // found decimal number zero spelled with multiple 0s
+                                    self.source.hide(1);
                                     number_type = TokenType::INTEGER;
                                 };
                             }
                             [next] if Self::is_dec_digit(next) => {
-                                // 0 digits are certaint to be part of one token but non-0 digits
+                                // 0 digits are certain to be part of one token but non-0 digits
                                 // are only part of the same token if it ends up being a float or
                                 // imaginary
                                 let last_zero = self.source.peeked_index() - 1;
@@ -560,6 +564,7 @@ impl TokenStream {
             }
             ['1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'] => {
                 self.find_end_of_integer(Self::is_dec_digit);
+                println!("{:?}", self.source.peeked_string());
                 match self.source.peek(1) {
                     ['.'] => {
                         // found fraction with integer part
@@ -586,6 +591,7 @@ impl TokenStream {
                         self.source.hide(1);
                     }
                 };
+                println!("{:?}", self.source.peeked_string());
             }
             ['.'] => {
                 match self.source.peek(1) {
@@ -631,27 +637,27 @@ impl TokenStream {
 
     /// Attempt to consume a newline
     /// advance the cursor if a newline is detected
-    fn consume_next_newline(&mut self) -> bool {
+    fn consume_next_newline(&mut self) -> Option<bool> {
         return match self.source.peek(2) {
-            [esc, nl] if *esc == '\\' && *nl == '\n' => {
+            ['\\', '\n'] => {
                 // no tokens produced when newline escaped
                 self.source.commit();
-                false
+                Some(false)
             }
-            [nl, ..] if *nl == '\n' => {
+            ['\n', ..] => {
                 self.source.hide(1);
                 if self.within_statement {
                     self.commit_to_token(TokenType::NEWLINE, TokenType::NEWLINE);
                     self.within_statement = false;
-                    true
+                    Some(true)
                 } else {
                     self.commit_to_token(TokenType::NL, TokenType::NL);
-                    true
+                    Some(true)
                 }
             }
             _ => {
                 self.source.revert();
-                false
+                None
             }
         };
     }
@@ -877,6 +883,7 @@ impl Iterator for TokenStream {
                     self.within_statement = true;
                     return Some(Ok(self.tokens.last().unwrap().clone()));
                 }
+
                 Ok(false) => (),
                 Err(e) => return Some(Err(e)),
             };
@@ -885,8 +892,13 @@ impl Iterator for TokenStream {
             // re-enter as there may be an indent after insignificant whitespace
             return self.next();
         };
-        if self.consume_next_newline() {
-            return Some(Ok(self.tokens.last().unwrap().clone()));
+        if let Some(produced_token) = self.consume_next_newline() {
+            if produced_token {
+                return Some(Ok(self.tokens.last().unwrap().clone()));
+            } else {
+                // re-enter; escaped newline is insignificant whitespace
+                return self.next();
+            };
         };
         // number must come before op to correctly capture a leading decimal point
         if self.consume_next_number_token() {
