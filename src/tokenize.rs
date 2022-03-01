@@ -453,23 +453,30 @@ impl TokenStream {
                         number_type = TokenType::HEXINT;
                         self.find_end_of_integer(Self::is_hex_digit);
                     }
-                    [next, ..] if Self::is_dec_digit(next) => {
-                        let is_zero = *next == '0';
-                            // put unchecked char back
-                        self.source.hide(1);
-                        if is_zero {
-                            // this is the longest possible integer token as only zero can have
-                            // leading 0s
+                    [next, ..] if Self::is_dec_digit(next) || *next == '_' => {
+                        // at this point the longest possible integer token is a zero as only zero
+                        // can have leading 0s
+                        let last_zero: usize;
+                        if *next == '_' {
+                            // put non-digit char back
+                            self.source.hide(2);
                             self.find_end_of_integer(|c| *c == '0');
+                            last_zero = self.source.peeked_index();
+                        } else if *next == '0' {
+                            // put unchecked char back
+                            self.source.hide(1);
+                            self.find_end_of_integer(|c| *c == '0');
+                            last_zero = self.source.peeked_index();
+                        } else {
+                            // put unchecked char back
+                            self.source.hide(1);
+                            last_zero = self.source.peeked_index() -1;
                         };
                         match self.source.peek(1) {
                             ['.'] => {
-                                // found fraction with integer part zero
                                 number_type = TokenType::FLOAT;
                                 self.find_end_of_integer(Self::is_dec_digit);
-                                if let ['e' | 'E'] = self.source.peek(1) {
-                                    self.find_end_of_exponent();
-                                } else {
+                                if !matches!(self.source.peek(1), ['e' | 'E']) || !self.find_end_of_exponent() {
                                     self.source.hide(1);
                                 };
                             }
@@ -479,15 +486,15 @@ impl TokenStream {
                                     number_type = TokenType::FLOAT;
                                 } else {
                                     // found decimal number zero spelled with multiple 0s
-                                    self.source.hide(1);
+                                    self.source
+                                        .hide(self.source.peeked_index() - last_zero);
                                     number_type = TokenType::INTEGER;
                                 };
                             }
-                            [next] if Self::is_dec_digit(next) => {
+                            [next] if Self::is_dec_digit(next) || *next == '_' => {
                                 // 0 digits are certain to be part of one token but non-0 digits
                                 // are only part of the same token if it ends up being a float or
                                 // imaginary
-                                let last_zero = self.source.peeked_index() - 1;
                                 self.find_end_of_integer(Self::is_dec_digit);
                                 match self.source.peek(1) {
                                     ['.'] => {
@@ -564,7 +571,6 @@ impl TokenStream {
             }
             ['1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'] => {
                 self.find_end_of_integer(Self::is_dec_digit);
-                println!("{:?}", self.source.peeked_string());
                 match self.source.peek(1) {
                     ['.'] => {
                         // found fraction with integer part
@@ -591,7 +597,6 @@ impl TokenStream {
                         self.source.hide(1);
                     }
                 };
-                println!("{:?}", self.source.peeked_string());
             }
             ['.'] => {
                 match self.source.peek(1) {
@@ -704,8 +709,8 @@ impl TokenStream {
                 Ok(true)
             }
             _ => {
-                let last_indent = self.indents_seen.pop().unwrap();
-                if last_indent < spaces {
+                self.indents_seen.pop();
+                if *self.indents_seen.last().unwrap() < spaces {
                     return Err(String::from(
                         "unindent does not match any outer indentation level",
                     ));

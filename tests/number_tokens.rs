@@ -148,6 +148,7 @@ fn single_hexint_token(#[case] source: &str) {
 #[case("00.e1")]
 #[case("0.0e1")]
 #[case("0e0")]
+#[case("010.23")]
 #[case("0000.0000e0000")]
 #[case("0123e456")]
 #[case("1.2_34e5_6_78")]
@@ -211,10 +212,20 @@ fn single_imaginary_token(#[case] source: &str) {
 }
 
 #[rstest]
-#[case("123_4_", 5)]
-#[case("123__4", 3)]
-#[case("123eyr", 3)]
-fn runon_number_tokens(#[case] source: &str, #[case] split: usize) {
+#[case("123_4_", 5, TokenType::INTEGER, TokenType::NAME, TokenType::NAME)]
+#[case("0_", 1, TokenType::INTEGER, TokenType::NAME, TokenType::NAME)]
+#[case("00_", 2, TokenType::INTEGER, TokenType::NAME, TokenType::NAME)]
+#[case("0e", 1, TokenType::INTEGER, TokenType::NAME, TokenType::NAME)]
+#[case("00e", 2, TokenType::INTEGER, TokenType::NAME, TokenType::NAME)]
+#[case("000e", 3, TokenType::INTEGER, TokenType::NAME, TokenType::NAME)]
+#[case("123__4", 3, TokenType::INTEGER, TokenType::NAME, TokenType::NAME)]
+#[case("123eyr", 3, TokenType::INTEGER, TokenType::NAME, TokenType::NAME)]
+#[case("000123", 3, TokenType::INTEGER, TokenType::NUMBER, TokenType::INTEGER)]
+#[case("010234", 1, TokenType::INTEGER, TokenType::NUMBER, TokenType::INTEGER)]
+#[case("0_12_3", 1, TokenType::INTEGER, TokenType::NAME, TokenType::NAME)]
+#[case("123.e", 4, TokenType::FLOAT, TokenType::NAME, TokenType::NAME)]
+#[case("12jeep", 3, TokenType::IMAGINARY, TokenType::NAME, TokenType::NAME)]
+fn runon_number_tokens(#[case] source: &str, #[case] split: usize, #[case] exact_number: TokenType, #[case] runon_type: TokenType, #[case] runon_exact: TokenType) {
     let size = source.chars().count();
     let tokens = source_to_tokens(source);
     assert_eq!(
@@ -222,14 +233,14 @@ fn runon_number_tokens(#[case] source: &str, #[case] split: usize) {
         &[
             Token {
                 token_type:TokenType::NUMBER,
-                exact_token_type:TokenType::INTEGER,
+                exact_token_type:exact_number,
                 token_contents:source[..split].to_string(),
                 col_start:0,
                 col_end:split,
             },
             Token {
-                token_type:TokenType::NAME,
-                exact_token_type:TokenType::NAME,
+                token_type:runon_type,
+                exact_token_type:runon_exact,
                 token_contents:source[split..].to_string(),
                 col_start:split,
                 col_end:size,
@@ -240,6 +251,46 @@ fn runon_number_tokens(#[case] source: &str, #[case] split: usize) {
                 token_contents:String::from("\n"),
                 col_start:size,
                 col_end:(size + 1),
+            },
+        ]
+    );
+}
+
+#[test]
+fn multiple_runon_number_tokens() {
+    let source = "0012eyr";
+    let size = source.chars().count();
+    let tokens = source_to_tokens(source);
+    assert_eq!(
+        &tokens[..],
+        &[
+            Token {
+                token_type:TokenType::NUMBER,
+                exact_token_type:TokenType::INTEGER,
+                token_contents:String::from("00"),
+                col_start:0,
+                col_end:2,
+            },
+            Token {
+                token_type:TokenType::NUMBER,
+                exact_token_type:TokenType::INTEGER,
+                token_contents:String::from("12"),
+                col_start:2,
+                col_end:4,
+            },
+            Token {
+                token_type:TokenType::NAME,
+                exact_token_type:TokenType::NAME,
+                token_contents:String::from("eyr"),
+                col_start:4,
+                col_end:7,
+            },
+            Token {
+                token_type:TokenType::NEWLINE,
+                exact_token_type:TokenType::NEWLINE,
+                token_contents:String::from("\n"),
+                col_start:7,
+                col_end:8,
             },
         ]
     );

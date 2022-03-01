@@ -1,5 +1,9 @@
+#![feature(assert_matches)]
+use std::assert_matches::assert_matches;
+
 use rstest::*;
 
+use rye::tokenize::TokenStream;
 use rye::tokens::{Token, TokenType};
 
 mod common;
@@ -26,8 +30,9 @@ use common::source_to_tokens;
     "
 rye
     cheese
-bread
-", 1
+        bread
+done
+", 2
 )]
 #[case(
     "
@@ -81,4 +86,17 @@ fn dent_tokens(#[case] source: &str, #[case] total_indents: usize) {
     };
     assert_eq!(indents_found, total_indents, "Not enough INDENTs were found. Was expecting {} got {}", total_indents, indents_found);
     assert_eq!(indents_found, dedents_found, "Not every INDENT had a DEDENT. Found {} more INDENTs", (indents_found - dedents_found));
+}
+
+//#[test]
+fn unmatched_dent() {
+    let maybe_tokens = TokenStream::new(
+"
+    rye
+        cheese
+          bread
+  unmatched
+"
+);
+    assert_matches!(maybe_tokens.into_iter().collect::<Result<Vec<Token>, String>>(), Err(_));
 }
