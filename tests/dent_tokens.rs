@@ -88,7 +88,7 @@ fn dent_tokens(#[case] source: &str, #[case] total_indents: usize) {
     assert_eq!(indents_found, dedents_found, "Not every INDENT had a DEDENT. Found {} more INDENTs", (indents_found - dedents_found));
 }
 
-//#[test]
+#[test]
 fn unmatched_dent() {
     let maybe_tokens = TokenStream::new(
 "

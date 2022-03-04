@@ -1,4 +1,5 @@
 use crate::tokens::{Token, TokenType};
+use std::collections::VecDeque;
 use std::cmp;
 
 use unicode_categories::UnicodeCategories;
@@ -64,7 +65,8 @@ pub struct TokenStream {
     source: RawSource,
     within_statement: bool,
     indents_seen: Vec<usize>,
-    tokens: Vec<Token>,
+    tokens: VecDeque<Token>,
+    ended: bool,
 }
 
 impl TokenStream {
@@ -73,7 +75,8 @@ impl TokenStream {
             source: RawSource::new(input),
             within_statement: false,
             indents_seen: vec![0],
-            tokens: Vec::new(),
+            tokens: VecDeque::new(),
+            ended: false,
         }
     }
 
@@ -85,7 +88,7 @@ impl TokenStream {
         col_start: usize,
         col_end: usize,
     ) {
-        self.tokens.push(Token {
+        self.tokens.push_back(Token {
             token_type,
             exact_token_type,
             token_contents,
@@ -709,14 +712,38 @@ impl TokenStream {
                 Ok(true)
             }
             _ => {
-                self.indents_seen.pop();
-                if *self.indents_seen.last().unwrap() < spaces {
-                    return Err(String::from(
-                        "unindent does not match any outer indentation level",
-                    ));
+                // DEDENT size must match a previously seen INDENT size
+                // one or more DEDENTs may be produced until such a match is found
+                self.source.commit();
+                loop {
+                    self.indents_seen.pop();
+                    match *self.indents_seen.last().unwrap() {
+                        s if s == spaces => {
+                            self.add_token(
+                                TokenType::DEDENT,
+                                TokenType::DEDENT,
+                                String::from(""),
+                                self.source.committed_index(),
+                                self.source.committed_index(),
+                            );
+                            return Ok(true)
+                        },
+                        s if s < spaces || self.indents_seen.len() == 1 => {
+                            return Err(String::from(
+                                "dedent does not match any outer indentation level",
+                            ));
+                        },
+                        _ => {
+                            self.add_token(
+                                TokenType::DEDENT,
+                                TokenType::DEDENT,
+                                String::from(""),
+                                self.source.committed_index(),
+                                self.source.committed_index(),
+                            );
+                        },
+                    };
                 };
-                self.commit_to_token(TokenType::DEDENT, TokenType::DEDENT);
-                Ok(true)
             }
         }
     }
@@ -830,54 +857,46 @@ impl TokenStream {
         self.commit_to_token(TokenType::STRING, TokenType::STRING);
         Ok(true)
     }
-}
 
-impl Iterator for TokenStream {
-    type Item = Result<Token, String>;
+    fn finalize_stream(&mut self) -> Result<(), String> {
+        if self.within_statement {
+            // all statements must end in a newline, even if not present in the source
+            self.add_token(
+                TokenType::NEWLINE,
+                TokenType::NEWLINE,
+                String::from("\n"),
+                self.source.committed_index(),
+                self.source.committed_index() + 1,
+            );
+        };
+        while self.indents_seen.len() > 1 {
+            // bottom of the stack is indent of size 0 and does not need a DEDENT
+            self.indents_seen.pop();
+            self.add_token(
+                TokenType::DEDENT,
+                TokenType::DEDENT,
+                String::from(""),
+                self.source.committed_index() + 1,
+                self.source.committed_index() + 1,
+            );
+        };
+        self.add_token(
+            TokenType::ENDMARKER,
+            TokenType::ENDMARKER,
+            String::from(""),
+            self.source.committed_index() + 1,
+            self.source.committed_index() + 1,
+        );
+        self.ended = true;
+        Ok(())
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn consume_next_token(&mut self) -> Result<(), String> {
+        if self.ended {
+            return Ok(());
+        };
         if self.source.at_end() {
-            if self.within_statement {
-                // all statements must end in a newline, even if not present in the source
-                self.within_statement = false;
-                self.add_token(
-                    TokenType::NEWLINE,
-                    TokenType::NEWLINE,
-                    String::from("\n"),
-                    self.source.committed_index(),
-                    self.source.committed_index() + 1,
-                );
-                return Some(Ok(self.tokens.last().unwrap().clone()));
-            } else if self.indents_seen.len() > 1 {
-                // bottom of the stack is indent of size 0 and does not need a DEDENT
-                self.indents_seen.pop();
-                self.add_token(
-                    TokenType::DEDENT,
-                    TokenType::DEDENT,
-                    String::from(""),
-                    self.source.committed_index() + 1,
-                    self.source.committed_index() + 1,
-                );
-                return Some(Ok(self.tokens.last().unwrap().clone()));
-            } else if let Some(Token {
-                token_type: TokenType::ENDMARKER,
-                exact_token_type: _,
-                token_contents: _,
-                col_start: _,
-                col_end: _,
-            }) = self.tokens.last()
-            {
-                return None;
-            } else {
-                self.add_token(
-                    TokenType::ENDMARKER,
-                    TokenType::ENDMARKER,
-                    String::from(""),
-                    self.source.committed_index() + 1,
-                    self.source.committed_index() + 1,
-                );
-                return Some(Ok(self.tokens.last().unwrap().clone()));
-            };
+            return self.finalize_stream();
         };
 
         // consume any significant whitespace
@@ -886,58 +905,75 @@ impl Iterator for TokenStream {
             match self.consume_next_dent() {
                 Ok(true) => {
                     self.within_statement = true;
-                    return Some(Ok(self.tokens.last().unwrap().clone()));
+                    return Ok(());
                 }
 
                 Ok(false) => (),
-                Err(e) => return Some(Err(e)),
+                Err(e) => return Err(e),
             };
         };
         if self.consume_next_whitespace() {
             // re-enter as there may be an indent after insignificant whitespace
-            return self.next();
+            return self.consume_next_token();
         };
         if let Some(produced_token) = self.consume_next_newline() {
             if produced_token {
-                return Some(Ok(self.tokens.last().unwrap().clone()));
+                return Ok(());
             } else {
                 // re-enter; escaped newline is insignificant whitespace
-                return self.next();
+                return self.consume_next_token();
             };
         };
         // number must come before op to correctly capture a leading decimal point
         if self.consume_next_number_token() {
             self.within_statement = true;
-            return Some(Ok(self.tokens.last().unwrap().clone()));
+            return Ok(());
         };
         if self.consume_next_op_token() {
             self.within_statement = true;
-            return Some(Ok(self.tokens.last().unwrap().clone()));
+            return Ok(());
         };
         // string must come before name to correctly capture prefix directives
         match self.consume_next_string_token() {
             Ok(true) => {
                 self.within_statement = true;
-                return Some(Ok(self.tokens.last().unwrap().clone()));
+                return Ok(());
             }
             Ok(false) => (),
-            Err(e) => return Some(Err(e)),
+            Err(e) => return Err(e),
         };
         if self.consume_next_name_token() {
             self.within_statement = true;
-            return Some(Ok(self.tokens.last().unwrap().clone()));
+            return Ok(());
         };
         if self.consume_next_comment() {
-            return Some(Ok(self.tokens.last().unwrap().clone()));
+            return Ok(());
         };
 
         // no tokens found
         if self.source.at_end() {
-            return self.next();
+            return self.consume_next_token();
         } else {
             self.source.peek(1);
             self.commit_to_token(TokenType::ERRORTOKEN, TokenType::ERRORTOKEN);
-            return Some(Ok(self.tokens.last().unwrap().clone()));
+            return Ok(());
         };
+    }
+}
+
+impl Iterator for TokenStream {
+    type Item = Result<Token, String>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.tokens.len() == 0 {
+            match self.consume_next_token() {
+                Ok(_) => (),
+                Err(e) => return Some(Err(e)),
+            }
+        };
+        match self.tokens.len() {
+            0 => None,
+            _ => Ok(self.tokens.pop_front()).transpose()
+        }
     }
 }
