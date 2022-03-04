@@ -12,6 +12,8 @@ use common::source_to_tokens;
 #[rstest]
 #[case("    rye", 1)]
 #[case("\trye", 1)]
+#[case("\u{000C}    rye", 1)]
+#[case("    \u{000C}rye", 1)]
 #[case("  rye", 1)]
 #[case("  \t    \trye", 1)]
 #[case(

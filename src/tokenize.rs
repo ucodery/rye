@@ -682,6 +682,9 @@ impl TokenStream {
             } else if *next == '\t' {
                 // round up to the next multiple of 8 spaces
                 spaces += 8 - (spaces % 8);
+            } else if *next == '\u{000C}' {
+                // formfeeds don't count toward indentation but may be interspersed
+                ();
             } else if *next == '\n' || *next == '\\' || *next == '#' {
                 // there is no code on this line and no tokens are produced from any indent
                 // any indent does not have to line up with any other line and has no significance
@@ -751,7 +754,7 @@ impl TokenStream {
     /// Attempt to consume any whitespace from the source
     /// advance the cursor if any whitespace if found
     /// This is NOT for finding INDENT/DEDENT or NL/NEWLINE tokens
-    fn consume_next_whitespace(&mut self) -> bool {
+    fn consume_next_whitespace(&mut self) {
         while let [next] = self.source.peek(1) {
             // space, tab, and formfeed are valid inter-token whitespace
             if *next != ' ' && *next != '\t' && *next != '\u{000C}' {
@@ -761,7 +764,6 @@ impl TokenStream {
         // everything but the last peek was whitespace
         self.source.hide(1);
         self.source.commit();
-        false
     }
 
     fn consume_next_comment(&mut self) -> bool {
@@ -907,15 +909,12 @@ impl TokenStream {
                     self.within_statement = true;
                     return Ok(());
                 }
-
                 Ok(false) => (),
                 Err(e) => return Err(e),
             };
         };
-        if self.consume_next_whitespace() {
-            // re-enter as there may be an indent after insignificant whitespace
-            return self.consume_next_token();
-        };
+        // non-dent whitespace does not produce tokens
+        self.consume_next_whitespace();
         if let Some(produced_token) = self.consume_next_newline() {
             if produced_token {
                 return Ok(());
