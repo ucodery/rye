@@ -1,6 +1,6 @@
 use crate::tokens::{Token, TokenType};
-use std::collections::VecDeque;
 use std::cmp;
+use std::collections::VecDeque;
 
 use unicode_categories::UnicodeCategories;
 
@@ -95,7 +95,6 @@ impl TokenStream {
             col_start,
             col_end,
         });
-
     }
 
     fn commit_to_token(&mut self, token_type: TokenType, exact_token_type: TokenType) {
@@ -473,13 +472,15 @@ impl TokenStream {
                         } else {
                             // put unchecked char back
                             self.source.hide(1);
-                            last_zero = self.source.peeked_index() -1;
+                            last_zero = self.source.peeked_index() - 1;
                         };
                         match self.source.peek(1) {
                             ['.'] => {
                                 number_type = TokenType::FLOAT;
                                 self.find_end_of_integer(Self::is_dec_digit);
-                                if !matches!(self.source.peek(1), ['e' | 'E']) || !self.find_end_of_exponent() {
+                                if !matches!(self.source.peek(1), ['e' | 'E'])
+                                    || !self.find_end_of_exponent()
+                                {
                                     self.source.hide(1);
                                 };
                             }
@@ -489,8 +490,7 @@ impl TokenStream {
                                     number_type = TokenType::FLOAT;
                                 } else {
                                     // found decimal number zero spelled with multiple 0s
-                                    self.source
-                                        .hide(self.source.peeked_index() - last_zero);
+                                    self.source.hide(self.source.peeked_index() - last_zero);
                                     number_type = TokenType::INTEGER;
                                 };
                             }
@@ -684,7 +684,7 @@ impl TokenStream {
                 spaces += 8 - (spaces % 8);
             } else if *next == '\u{000C}' {
                 // formfeeds don't count toward indentation but may be interspersed
-                ();
+                continue;
             } else if *next == '\n' || *next == '\\' || *next == '#' {
                 // there is no code on this line and no tokens are produced from any indent
                 // any indent does not have to line up with any other line and has no significance
@@ -729,13 +729,13 @@ impl TokenStream {
                                 self.source.committed_index(),
                                 self.source.committed_index(),
                             );
-                            return Ok(true)
-                        },
+                            return Ok(true);
+                        }
                         s if s < spaces || self.indents_seen.len() == 1 => {
                             return Err(String::from(
                                 "dedent does not match any outer indentation level",
                             ));
-                        },
+                        }
                         _ => {
                             self.add_token(
                                 TokenType::DEDENT,
@@ -744,9 +744,9 @@ impl TokenStream {
                                 self.source.committed_index(),
                                 self.source.committed_index(),
                             );
-                        },
+                        }
                     };
-                };
+                }
             }
         }
     }
@@ -881,7 +881,7 @@ impl TokenStream {
                 self.source.committed_index() + 1,
                 self.source.committed_index() + 1,
             );
-        };
+        }
         self.add_token(
             TokenType::ENDMARKER,
             TokenType::ENDMARKER,
@@ -964,15 +964,16 @@ impl Iterator for TokenStream {
     type Item = Result<Token, String>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.tokens.len() == 0 {
+        if self.tokens.is_empty() {
             match self.consume_next_token() {
                 Ok(_) => (),
                 Err(e) => return Some(Err(e)),
             }
         };
-        match self.tokens.len() {
-            0 => None,
-            _ => Ok(self.tokens.pop_front()).transpose()
+        if self.tokens.is_empty() {
+            None
+        } else {
+            Ok(self.tokens.pop_front()).transpose()
         }
     }
 }

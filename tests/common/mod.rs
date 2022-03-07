@@ -1,5 +1,4 @@
 #[cfg(test)]
-
 use rye::tokenize::TokenStream;
 use rye::tokens::{Token, TokenType};
 
@@ -9,8 +8,7 @@ use rye::tokens::{Token, TokenType};
 pub fn source_to_tokens(source: &str) -> Vec<Token> {
     let source_len = source.chars().count();
 
-    let maybe_tokens: Result<Vec<Token>, String> =
-        TokenStream::new(source).into_iter().collect();
+    let maybe_tokens: Result<Vec<Token>, String> = TokenStream::new(source).into_iter().collect();
     assert!(
         maybe_tokens.is_ok(),
         "{} while tokenizing source {}",

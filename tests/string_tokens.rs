@@ -116,7 +116,7 @@ fn single_triple_string(
 #[case("\"rye'")]
 #[case("\"rye\\\"")]
 fn unterminated_string(#[case] source: &str) {
-    let mut tokens = source_to_tokens(source);
+    let tokens = source_to_tokens(source);
     assert!(
         tokens.len() > 0,
         "Too few tokens found: {}",
@@ -158,10 +158,15 @@ fn unterminated_string(#[case] source: &str) {
 #[test]
 fn unterminated_triple_string() {
     let maybe_tokens = TokenStream::new(
-"
+        "
 \"\"\"
     rye
-"
-);
-    assert_matches!(maybe_tokens.into_iter().collect::<Result<Vec<Token>, String>>(), Err(_));
+",
+    );
+    assert_matches!(
+        maybe_tokens
+            .into_iter()
+            .collect::<Result<Vec<Token>, String>>(),
+        Err(_)
+    );
 }

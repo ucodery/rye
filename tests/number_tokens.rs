@@ -225,32 +225,38 @@ fn single_imaginary_token(#[case] source: &str) {
 #[case("0_12_3", 1, TokenType::INTEGER, TokenType::NAME, TokenType::NAME)]
 #[case("123.e", 4, TokenType::FLOAT, TokenType::NAME, TokenType::NAME)]
 #[case("12jeep", 3, TokenType::IMAGINARY, TokenType::NAME, TokenType::NAME)]
-fn runon_number_tokens(#[case] source: &str, #[case] split: usize, #[case] exact_number: TokenType, #[case] runon_type: TokenType, #[case] runon_exact: TokenType) {
+fn runon_number_tokens(
+    #[case] source: &str,
+    #[case] split: usize,
+    #[case] exact_number: TokenType,
+    #[case] runon_type: TokenType,
+    #[case] runon_exact: TokenType,
+) {
     let size = source.chars().count();
     let tokens = source_to_tokens(source);
     assert_eq!(
         &tokens[..],
         &[
             Token {
-                token_type:TokenType::NUMBER,
-                exact_token_type:exact_number,
-                token_contents:source[..split].to_string(),
-                col_start:0,
-                col_end:split,
+                token_type: TokenType::NUMBER,
+                exact_token_type: exact_number,
+                token_contents: source[..split].to_string(),
+                col_start: 0,
+                col_end: split,
             },
             Token {
-                token_type:runon_type,
-                exact_token_type:runon_exact,
-                token_contents:source[split..].to_string(),
-                col_start:split,
-                col_end:size,
+                token_type: runon_type,
+                exact_token_type: runon_exact,
+                token_contents: source[split..].to_string(),
+                col_start: split,
+                col_end: size,
             },
             Token {
-                token_type:TokenType::NEWLINE,
-                exact_token_type:TokenType::NEWLINE,
-                token_contents:String::from("\n"),
-                col_start:size,
-                col_end:(size + 1),
+                token_type: TokenType::NEWLINE,
+                exact_token_type: TokenType::NEWLINE,
+                token_contents: String::from("\n"),
+                col_start: size,
+                col_end: (size + 1),
             },
         ]
     );
@@ -259,38 +265,37 @@ fn runon_number_tokens(#[case] source: &str, #[case] split: usize, #[case] exact
 #[test]
 fn multiple_runon_number_tokens() {
     let source = "0012eyr";
-    let size = source.chars().count();
     let tokens = source_to_tokens(source);
     assert_eq!(
         &tokens[..],
         &[
             Token {
-                token_type:TokenType::NUMBER,
-                exact_token_type:TokenType::INTEGER,
-                token_contents:String::from("00"),
-                col_start:0,
-                col_end:2,
+                token_type: TokenType::NUMBER,
+                exact_token_type: TokenType::INTEGER,
+                token_contents: String::from("00"),
+                col_start: 0,
+                col_end: 2,
             },
             Token {
-                token_type:TokenType::NUMBER,
-                exact_token_type:TokenType::INTEGER,
-                token_contents:String::from("12"),
-                col_start:2,
-                col_end:4,
+                token_type: TokenType::NUMBER,
+                exact_token_type: TokenType::INTEGER,
+                token_contents: String::from("12"),
+                col_start: 2,
+                col_end: 4,
             },
             Token {
-                token_type:TokenType::NAME,
-                exact_token_type:TokenType::NAME,
-                token_contents:String::from("eyr"),
-                col_start:4,
-                col_end:7,
+                token_type: TokenType::NAME,
+                exact_token_type: TokenType::NAME,
+                token_contents: String::from("eyr"),
+                col_start: 4,
+                col_end: 7,
             },
             Token {
-                token_type:TokenType::NEWLINE,
-                exact_token_type:TokenType::NEWLINE,
-                token_contents:String::from("\n"),
-                col_start:7,
-                col_end:8,
+                token_type: TokenType::NEWLINE,
+                exact_token_type: TokenType::NEWLINE,
+                token_contents: String::from("\n"),
+                col_start: 7,
+                col_end: 8,
             },
         ]
     );

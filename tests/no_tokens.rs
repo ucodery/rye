@@ -105,10 +105,6 @@ fn explicit_line_join(#[case] source: &str, #[case] is_statement: bool) {
             col_end: _,
         } = token;
         assert_ne!(token_type, TokenType::NL, "Got extra NL Token",);
-        assert_ne!(
-            token_type,
-            TokenType::NEWLINE,
-            "Got extra NEWLINE Token",
-        );
+        assert_ne!(token_type, TokenType::NEWLINE, "Got extra NEWLINE Token",);
     }
 }
