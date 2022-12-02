@@ -64,6 +64,9 @@ impl RawSource {
 pub struct TokenStream {
     source: RawSource,
     within_statement: bool,
+    parenthesis_level: usize,
+    bracket_level: usize,
+    brace_level: usize,
     indents_seen: Vec<usize>,
     tokens: VecDeque<Token>,
     ended: bool,
@@ -74,6 +77,9 @@ impl TokenStream {
         TokenStream {
             source: RawSource::new(input),
             within_statement: false,
+            parenthesis_level: 0,
+            bracket_level: 0,
+            brace_level: 0,
             indents_seen: vec![0],
             tokens: VecDeque::new(),
             ended: false,
@@ -97,7 +103,11 @@ impl TokenStream {
         });
     }
 
-    fn commit_to_token(&mut self, token_type: TokenType, exact_token_type: TokenType) {
+    fn commit_to_token(&mut self, token_type: TokenType) {
+        self.commit_to_exact_token(token_type, token_type)
+    }
+
+    fn commit_to_exact_token(&mut self, token_type: TokenType, exact_token_type: TokenType) {
         self.add_token(
             token_type,
             exact_token_type,
@@ -106,6 +116,12 @@ impl TokenStream {
             self.source.peeked_index(),
         );
         self.source.commit();
+        if token_type == TokenType::NEWLINE {
+            self.within_statement = false;
+        } else if !(token_type == TokenType::NL || token_type == TokenType::COMMENT) {
+            self.within_statement = true;
+        };
+        // else NL and COMMENT don't either start or end a statement
     }
 
     /// Attempt to consume the longest valid op token from the source
@@ -209,10 +225,12 @@ impl TokenStream {
             ['(', ..] => {
                 exact_token_type = TokenType::LPAR;
                 self.source.hide(2);
+                self.parenthesis_level += 1;
             }
             [')', ..] => {
                 exact_token_type = TokenType::RPAR;
                 self.source.hide(2);
+                self.parenthesis_level = self.parenthesis_level.saturating_sub(1);
             }
             ['*', ..] => {
                 exact_token_type = TokenType::STAR;
@@ -265,10 +283,12 @@ impl TokenStream {
             ['[', ..] => {
                 exact_token_type = TokenType::LSQB;
                 self.source.hide(2);
+                self.bracket_level += 1;
             }
             [']', ..] => {
                 exact_token_type = TokenType::RSQB;
                 self.source.hide(2);
+                self.bracket_level = self.bracket_level.saturating_sub(1);
             }
             ['^', ..] => {
                 exact_token_type = TokenType::CIRCUMFLEX;
@@ -277,6 +297,7 @@ impl TokenStream {
             ['{', ..] => {
                 exact_token_type = TokenType::LBRACE;
                 self.source.hide(2);
+                self.brace_level += 1;
             }
             ['|', ..] => {
                 exact_token_type = TokenType::VBAR;
@@ -285,6 +306,7 @@ impl TokenStream {
             ['}', ..] => {
                 exact_token_type = TokenType::RBRACE;
                 self.source.hide(2);
+                self.brace_level = self.brace_level.saturating_sub(1);
             }
             ['~', ..] => {
                 exact_token_type = TokenType::TILDE;
@@ -295,7 +317,7 @@ impl TokenStream {
                 return false;
             }
         }
-        self.commit_to_token(TokenType::OP, exact_token_type);
+        self.commit_to_exact_token(TokenType::OP, exact_token_type);
         true
     }
 
@@ -344,7 +366,7 @@ impl TokenStream {
             };
         }
 
-        self.commit_to_token(TokenType::NAME, TokenType::NAME);
+        self.commit_to_token(TokenType::NAME);
         true
     }
 
@@ -639,7 +661,7 @@ impl TokenStream {
             exact_token_type = number_type;
         };
 
-        self.commit_to_token(TokenType::NUMBER, exact_token_type);
+        self.commit_to_exact_token(TokenType::NUMBER, exact_token_type);
         true
     }
 
@@ -654,12 +676,15 @@ impl TokenStream {
             }
             ['\n', ..] => {
                 self.source.hide(1);
-                if self.within_statement {
-                    self.commit_to_token(TokenType::NEWLINE, TokenType::NEWLINE);
-                    self.within_statement = false;
+                if self.within_statement
+                    && self.parenthesis_level == 0
+                    && self.bracket_level == 0
+                    && self.brace_level == 0
+                {
+                    self.commit_to_token(TokenType::NEWLINE);
                     Some(true)
                 } else {
-                    self.commit_to_token(TokenType::NL, TokenType::NL);
+                    self.commit_to_token(TokenType::NL);
                     Some(true)
                 }
             }
@@ -711,7 +736,7 @@ impl TokenStream {
             }
             s if s < spaces => {
                 self.indents_seen.push(spaces);
-                self.commit_to_token(TokenType::INDENT, TokenType::INDENT);
+                self.commit_to_token(TokenType::INDENT);
                 Ok(true)
             }
             _ => {
@@ -775,7 +800,7 @@ impl TokenStream {
                     };
                 }
                 self.source.hide(1);
-                self.commit_to_token(TokenType::COMMENT, TokenType::COMMENT);
+                self.commit_to_token(TokenType::COMMENT);
                 return true;
             };
         };
@@ -842,31 +867,32 @@ impl TokenStream {
         };
         match self.source.peek(2) {
             [a, b] if [*a, *b] == [qt, qt] => {
-                if let Err(errmsg) = self.find_end_tripple_quote([qt, qt, qt]) {
-                    return Err(errmsg);
-                };
+                self.find_end_tripple_quote([qt, qt, qt])?;
             }
             _ => {
                 self.source.hide(2);
                 if !self.find_end_quote([qt]) {
                     self.source.revert();
                     self.source.peek(1);
-                    self.commit_to_token(TokenType::ERRORTOKEN, TokenType::ERRORTOKEN);
+                    self.commit_to_token(TokenType::ERRORTOKEN);
                     return Ok(true);
                 };
             }
         };
-        self.commit_to_token(TokenType::STRING, TokenType::STRING);
+        self.commit_to_token(TokenType::STRING);
         Ok(true)
     }
 
     fn finalize_stream(&mut self) -> Result<(), String> {
+        if self.parenthesis_level != 0 || self.brace_level != 0 || self.bracket_level != 0 {
+            return Err(String::from("EOF in multi-line statement"));
+        }
         if self.within_statement {
             // all statements must end in a newline, even if not present in the source
             self.add_token(
                 TokenType::NEWLINE,
                 TokenType::NEWLINE,
-                String::from("\n"),
+                String::from(""),
                 self.source.committed_index(),
                 self.source.committed_index() + 1,
             );
@@ -906,7 +932,6 @@ impl TokenStream {
         if !self.within_statement {
             match self.consume_next_dent() {
                 Ok(true) => {
-                    self.within_statement = true;
                     return Ok(());
                 }
                 Ok(false) => (),
@@ -925,24 +950,20 @@ impl TokenStream {
         };
         // number must come before op to correctly capture a leading decimal point
         if self.consume_next_number_token() {
-            self.within_statement = true;
             return Ok(());
         };
         if self.consume_next_op_token() {
-            self.within_statement = true;
             return Ok(());
         };
         // string must come before name to correctly capture prefix directives
         match self.consume_next_string_token() {
             Ok(true) => {
-                self.within_statement = true;
                 return Ok(());
             }
             Ok(false) => (),
             Err(e) => return Err(e),
         };
         if self.consume_next_name_token() {
-            self.within_statement = true;
             return Ok(());
         };
         if self.consume_next_comment() {
@@ -954,7 +975,7 @@ impl TokenStream {
             return self.consume_next_token();
         } else {
             self.source.peek(1);
-            self.commit_to_token(TokenType::ERRORTOKEN, TokenType::ERRORTOKEN);
+            self.commit_to_token(TokenType::ERRORTOKEN);
             return Ok(());
         };
     }

@@ -2,7 +2,7 @@ use rstest::*;
 
 use rye::tokens::{Token, TokenType};
 
-mod common;
+pub mod common;
 use common::{check_single_token_statement, source_to_tokens};
 
 #[rstest]
@@ -254,7 +254,7 @@ fn runon_number_tokens(
             Token {
                 token_type: TokenType::NEWLINE,
                 exact_token_type: TokenType::NEWLINE,
-                token_contents: String::from("\n"),
+                token_contents: String::from(""),
                 col_start: size,
                 col_end: (size + 1),
             },
@@ -293,7 +293,7 @@ fn multiple_runon_number_tokens() {
             Token {
                 token_type: TokenType::NEWLINE,
                 exact_token_type: TokenType::NEWLINE,
-                token_contents: String::from("\n"),
+                token_contents: String::from(""),
                 col_start: 7,
                 col_end: 8,
             },

@@ -2,17 +2,16 @@ use rstest::*;
 
 use rye::tokens::{Token, TokenType};
 
-mod common;
-use common::check_single_token_statement;
+pub mod common;
+use common::{check_single_token_statement, source_to_tokens};
 
 #[rstest]
 #[case("~", TokenType::TILDE)]
 #[case("}", TokenType::RBRACE)]
 #[case("|", TokenType::VBAR)]
-#[case("{", TokenType::LBRACE)]
 #[case("^", TokenType::CIRCUMFLEX)]
 #[case("]", TokenType::RSQB)]
-#[case("[", TokenType::LSQB)]
+#[case(")", TokenType::RPAR)]
 #[case("@", TokenType::AT)]
 #[case("=", TokenType::EQUAL)]
 #[case("<", TokenType::LESS)]
@@ -25,8 +24,6 @@ use common::check_single_token_statement;
 #[case(",", TokenType::COMMA)]
 #[case("+", TokenType::PLUS)]
 #[case("*", TokenType::STAR)]
-#[case(")", TokenType::RPAR)]
-#[case("(", TokenType::LPAR)]
 #[case("&", TokenType::AMPER)]
 #[case("%", TokenType::PERCENT)]
 #[case("|=", TokenType::VBAREQUAL)]
@@ -74,5 +71,89 @@ fn single_symbol_token(#[case] source: &str, #[case] exact: TokenType) {
         "Symbol Token not of exact type {}, got type {}",
         format!("{:?}", exact),
         format!("{:?}", exact_token_type)
+    );
+}
+
+#[rstest]
+#[case("()", TokenType::LPAR, "(", TokenType::RPAR, ")")]
+#[case("[]", TokenType::LSQB, "[", TokenType::RSQB, "]")]
+#[case("{}", TokenType::LBRACE, "{", TokenType::RBRACE, "}")]
+fn symbol_pair_tokens(
+    #[case] source: &str,
+    #[case] first_type: TokenType,
+    #[case] first_str: &str,
+    #[case] second_type: TokenType,
+    #[case] second_str: &str,
+) {
+    let mut tokens = source_to_tokens(source);
+
+    assert!(
+        tokens.len() == 3,
+        "Not enough tokens found: {}",
+        format!("{:?}", tokens)
+    );
+
+    let Token {
+        token_type,
+        exact_token_type,
+        token_contents,
+        col_start: _,
+        col_end: _,
+    } = tokens.pop().unwrap();
+    assert_eq!(
+        token_type,
+        TokenType::NEWLINE,
+        "Token Stream did not end in expected NEWLINE"
+    );
+    assert_eq!(
+        exact_token_type,
+        TokenType::NEWLINE,
+        "Token Stream did not end in expected NEWLINE"
+    );
+    assert_eq!(
+        token_contents, "",
+        "NEWLINE does not have expected contents"
+    );
+
+    let Token {
+        token_type,
+        exact_token_type,
+        token_contents,
+        col_start: _,
+        col_end: _,
+    } = tokens.pop().unwrap();
+    assert_eq!(
+        token_type,
+        TokenType::OP,
+        "Token Stream did not end in expected TOKEN"
+    );
+    assert_eq!(
+        exact_token_type, second_type,
+        "Token Stream did not end in expected TOKEN"
+    );
+    assert_eq!(
+        token_contents, second_str,
+        "TOKEN does not have expected contents"
+    );
+
+    let Token {
+        token_type,
+        exact_token_type,
+        token_contents,
+        col_start: _,
+        col_end: _,
+    } = tokens.pop().unwrap();
+    assert_eq!(
+        token_type,
+        TokenType::OP,
+        "Token Stream did not end in expected TOKEN"
+    );
+    assert_eq!(
+        exact_token_type, first_type,
+        "Token Stream did not end in expected TOKEN"
+    );
+    assert_eq!(
+        token_contents, first_str,
+        "TOKEN does not have expected contents"
     );
 }

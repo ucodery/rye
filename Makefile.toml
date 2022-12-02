@@ -35,22 +35,3 @@ args = [".", "--binary-path", "target/debug/", "-s", ".", "-t", "html", "--branc
 command = "open"
 args = ["./grcov/index.html"]
 dependencies = ["_clean_grcov", "_make_grcov", "_build_grcov", "_test_grcov", "_html_grcov"]
-
-# Github Flow #
-[tasks.commit]
-command = "git"
-args = ["commit", "--message", "done for today"]
-
-[tasks.push]
-command = "git"
-args = ["push"]
-
-[tasks.pull]
-command = "git"
-args = ["pull", "ucodery", "--ff"]
-
-[tasks.done]
-dependencies = ["commit", "push"]
-
-[tasks.do]
-dependencies = ["pull"]

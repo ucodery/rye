@@ -2,7 +2,7 @@ use rstest::*;
 
 use rye::tokens::{Token, TokenType};
 
-mod common;
+pub mod common;
 use common::source_to_tokens;
 
 #[rstest]

@@ -2,7 +2,7 @@ use rstest::*;
 
 use rye::tokens::{Token, TokenType};
 
-mod common;
+pub mod common;
 use common::source_to_tokens;
 
 #[rstest]
@@ -57,5 +57,32 @@ fn significant_newline_token(#[case] source: &str) {
         TokenType::NEWLINE,
         "Symbol Token not of exact type NEWLINE, got type {}",
         format!("{:?}", exact_token_type)
+    );
+}
+
+#[rstest]
+#[case(
+    "rye(
+)"
+)]
+fn logical_lines(#[case] source: &str) {
+    let mut newlines_found = 0;
+    let tokens = source_to_tokens(source);
+    for Token {
+        token_type,
+        exact_token_type: _,
+        token_contents: _,
+        col_start: _,
+        col_end: _,
+    } in tokens.iter()
+    {
+        if *token_type == TokenType::NEWLINE {
+            newlines_found += 1;
+        };
+    }
+    //assert only one NEWLINE
+    assert_eq!(
+        newlines_found, 1,
+        "Multiple NEWLINEs found. Was expecting all other newline characters to be NL"
     );
 }

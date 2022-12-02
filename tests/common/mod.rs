@@ -90,7 +90,7 @@ pub fn check_single_token_statement(source: &str) -> Token {
         "Token Stream did not end in expected NEWLINE"
     );
     assert_eq!(
-        token_contents, "\n",
+        token_contents, "",
         "NEWLINE does not have expected contents"
     );
     assert_eq!(col_start, source_len, "NEWLINE did not start after TOKEN");

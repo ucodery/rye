@@ -1,0 +1,1 @@
+- [ ] support all newlines. Not just `\n` but also `\n\r` and `\r`
